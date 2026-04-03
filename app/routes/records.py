@@ -17,28 +17,36 @@ _create_schema = RecordCreateSchema()
 _update_schema = RecordUpdateSchema()
 
 
-# ✅ FIXED
+#  LIST RECORDS (WITH FULL FILTERING + ERROR HANDLING)
 @records_bp.get("/")
 @jwt_required()
 @require_active
 def list_records():
     page, limit, skip = get_pagination_params()
 
-    docs, total = RecordService.list_records(
-        page=page, limit=limit, skip=skip,
-        record_type=request.args.get("type"),
-        category=request.args.get("category"),
-        date_from=request.args.get("date_from"),
-        date_to=request.args.get("date_to"),
-        search=request.args.get("search"),
-    )
+    try:
+        docs, total = RecordService.list_records(
+            page=page,
+            limit=limit,
+            skip=skip,
+            record_type=request.args.get("type"),
+            category=request.args.get("category"),
+            date_from=request.args.get("date_from"),
+            date_to=request.args.get("date_to"),
+            search=request.args.get("search"),
+        )
+    except ValueError as e:
+        return error(str(e), 400)
 
     return success(paginate_response(
-        [RecordModel.to_dict(d) for d in docs], total, page, limit
+        [RecordModel.to_dict(d) for d in docs],
+        total,
+        page,
+        limit
     ))
 
 
-# ✅ FIXED
+#  CREATE RECORD
 @records_bp.post("/")
 @jwt_required()
 @require_role(Role.ADMIN)
@@ -48,14 +56,15 @@ def create_record():
     except ValidationError as exc:
         return error("Validation failed.", 422, exc.messages)
 
-    user_id = get_jwt_identity()   # ✅ FIXED
+    user_id = get_jwt_identity()
 
+    #  Ensure proper datetime format
     record_date = data["date"]
     if not isinstance(record_date, datetime):
         record_date = datetime(record_date.year, record_date.month, record_date.day)
 
     doc = RecordService.create(
-        user_id=user_id,   # ✅ FIXED
+        user_id=user_id,
         amount=data["amount"],
         record_type=data["type"],
         category=data["category"],
@@ -66,18 +75,20 @@ def create_record():
     return created(RecordModel.to_dict(doc), "Record created.")
 
 
-# ✅ FIXED
+#  GET SINGLE RECORD
 @records_bp.get("/<record_id>")
 @jwt_required()
 @require_active
 def get_record(record_id):
     doc = RecordService.get_by_id(record_id)
+
     if not doc:
         return not_found("Record not found.")
+
     return success(RecordModel.to_dict(doc))
 
 
-# ✅ FIXED
+#  UPDATE RECORD
 @records_bp.patch("/<record_id>")
 @jwt_required()
 @require_role(Role.ADMIN)
@@ -87,9 +98,11 @@ def update_record(record_id):
     except ValidationError as exc:
         return error("Validation failed.", 422, exc.messages)
 
-    if "date" in data and not isinstance(data["date"], datetime):
+    #  Normalize date if present
+    if "date" in data:
         d = data["date"]
-        data["date"] = datetime(d.year, d.month, d.day)
+        if not isinstance(d, datetime):
+            data["date"] = datetime(d.year, d.month, d.day)
 
     doc, err = RecordService.update(record_id, data)
 
@@ -99,7 +112,7 @@ def update_record(record_id):
     return success(RecordModel.to_dict(doc), "Record updated.")
 
 
-# ✅ FIXED
+#  DELETE RECORD (SOFT DELETE)
 @records_bp.delete("/<record_id>")
 @jwt_required()
 @require_role(Role.ADMIN)
