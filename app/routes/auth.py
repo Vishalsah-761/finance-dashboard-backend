@@ -71,7 +71,7 @@ def login():
     )
 
 
-# 🔥 FIXED ROUTE
+#  FIXED ROUTE
 @auth_bp.get("/me")
 @jwt_required()
 @require_active
@@ -108,7 +108,7 @@ def change_password():
     return success(message=msg)
 
 
-# 🔥 FINAL TOKEN GENERATION (BEST PRACTICE)
+#  FINAL TOKEN GENERATION (BEST PRACTICE)
 def _make_token(user: dict) -> str:
     return create_access_token(
         identity=str(user["_id"]),   # only ID
